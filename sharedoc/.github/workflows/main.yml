@@ -1,0 +1,74 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: # Permite ejecutar manualmente
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      
+    - name: Install dependencies
+      run: npm install
+      
+    - name: Setup Expo CLI
+      run: npm install -g @expo/cli
+      
+    - name: Create app.json if not exists
+      run: |
+        if [ ! -f app.json ]; then
+          echo "Creating basic app.json..."
+          cat > app.json << EOF
+        {
+          "expo": {
+            "name": "MyApp",
+            "slug": "my-app",
+            "version": "1.0.0",
+            "platforms": ["ios", "android"],
+            "android": {
+              "package": "com.myapp.myapp"
+            }
+          }
+        }
+        EOF
+        fi
+        
+    - name: Prebuild Android
+      run: npx expo prebuild --platform android --clean
+      
+    - name: Make gradlew executable
+      run: chmod +x android/gradlew
+      
+    - name: Build Android APK
+      run: |
+        cd android
+        ./gradlew assembleRelease
+        
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-apk
+        path: android/app/build/outputs/apk/release/app-release.apk
+        retention-days: 30
